@@ -31,12 +31,16 @@ COLORS = {
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Memory Game")
 
+# Initialize font for timer
+font = pygame.font.Font(None, 24)
+
 # Game variables
 cards = []
 flipped_cards = []
 found_pairs = []
 game_over = False
 card_colors = {}
+start_time = pygame.time.get_ticks()
 
 # Check if we have enough colors for the pairs, if not repeat the color list
 if ROWS * COLS // 2 > len(COLORS):
@@ -68,6 +72,14 @@ clock = pygame.time.Clock()
 running = True
 while running:
     screen.fill(WHITE)
+    
+    # Timer calculation
+    elapsed_time = pygame.time.get_ticks() - start_time
+    minutes = elapsed_time // 60000  # 60000 milliseconds in a minute
+    seconds = (elapsed_time % 60000) // 1000  # 1000 milliseconds in a second
+    timer_text = f"{minutes:02}:{seconds:02}"
+    timer_surface = font.render(timer_text, True, BLACK)
+    timer_rect = timer_surface.get_rect(topleft=(10, 10))
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -82,7 +94,7 @@ while running:
                     if flipped_cards[0]['value'] == flipped_cards[1]['value']:
                         found_pairs.extend(flipped_cards)
                     else:
-                        pygame.time.wait(500)
+                        pygame.time.wait(300)
                     flipped_cards = []
 
     for row in cards:
@@ -98,6 +110,7 @@ while running:
     for i in range(1, ROWS):
         pygame.draw.line(screen, BLACK, (0, i * CARD_HEIGHT), (WIDTH, i * CARD_HEIGHT), 3)
 
+    screen.blit(timer_surface, timer_rect)
     pygame.display.flip()
     clock.tick(FPS)
 
