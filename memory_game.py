@@ -15,6 +15,9 @@ WHITE = (255, 255, 255)
 GRAY = (200, 200, 200)
 BLACK = (0, 0, 0)  # Color for the lines
 
+# Sounds
+positive_sound = pygame.mixer.Sound("/Users/rotempeled/Downloads/mixkit-winning-a-coin-video-game-2069.wav")
+
 # Pastel colors for the cards
 COLORS = {
     'pink': (255, 150, 237),
@@ -93,6 +96,7 @@ while running:
                 if len(flipped_cards) == 2:
                     if flipped_cards[0]['value'] == flipped_cards[1]['value']:
                         found_pairs.extend(flipped_cards)
+                        positive_sound.play()
                     else:
                         pygame.time.wait(300)
                     flipped_cards = []
