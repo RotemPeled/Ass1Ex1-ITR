@@ -28,6 +28,12 @@ COLORS = {
 # Sounds
 positive_sound = pygame.mixer.Sound("/Users/rotempeled/Downloads/mixkit-winning-a-coin-video-game-2069.wav")
 
+# Control panel dimensions
+control_panel_height = 50  # Adjust the height as needed
+HEIGHT += control_panel_height
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+
+
 # Set up the display
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Memory Game")
@@ -36,11 +42,14 @@ pygame.display.set_caption("Memory Game")
 font = pygame.font.Font(None, 24)
 large_font = pygame.font.Font(None, 60)  
 
-# Reset and Play again button
-reset_button = pygame.Rect(WIDTH - 120, 10, 50, 50)
+# Buttons
 reset_button_color = (255, 0, 0)
 play_again_button = pygame.Rect(WIDTH // 2 - 100, HEIGHT // 2, 200, 50)  
 play_again_button_color = (0, 0, 0)
+reset_button = pygame.Rect(WIDTH - 120, HEIGHT - control_panel_height + (control_panel_height - 50) // 2 + 5, 70, 40)
+show_all_button_color = (100, 100, 255)  # A distinct color
+show_all_used = False
+show_all_button = pygame.Rect(30, HEIGHT - control_panel_height + (control_panel_height - 50) // 2 + 5, 120, 40)
 
 
 def reset_game():
@@ -51,6 +60,7 @@ def reset_game():
     game_over = False
     card_colors = {}
     start_time = pygame.time.get_ticks()
+    show_all_used = False
 
     if ROWS * COLS // 2 > len(COLORS):
         color_keys = list(COLORS) * (ROWS * COLS // 2 // len(COLORS) + 1)
@@ -81,7 +91,21 @@ reset_game()
 clock = pygame.time.Clock()
 running = True
 while running:
-    screen.fill(WHITE)
+    screen.fill(BLACK)
+    for row in cards:
+        for card in row:
+            if card in flipped_cards or card in found_pairs:
+                pygame.draw.rect(screen, card['color'], card['rect'])
+            else:
+                pygame.draw.rect(screen, GRAY, card['rect'])
+
+    # Draw lines between cards
+    CARD_AREA_HEIGHT = HEIGHT - control_panel_height
+    for i in range(1, COLS):
+        pygame.draw.line(screen, BLACK, (i * CARD_WIDTH, 0), (i * CARD_WIDTH, CARD_AREA_HEIGHT),5)
+    for i in range(1, ROWS):
+        pygame.draw.line(screen, BLACK, (0, i * CARD_HEIGHT), (WIDTH, i * CARD_HEIGHT),5)
+        
     if len(found_pairs) == ROWS * COLS and not game_over:
         game_over = True
     # Timer calculation
@@ -103,7 +127,20 @@ while running:
                 continue
             if reset_button.collidepoint((x, y)):
                 reset_game()
+                show_all_used = False
                 continue
+            if show_all_button.collidepoint((x, y)) and not show_all_used:
+                for row in cards:
+                    for card in row:
+                        pygame.draw.rect(screen, card['color'], card['rect'])
+                for i in range(1, COLS):
+                    pygame.draw.line(screen, BLACK, (i * CARD_WIDTH, 0), (i * CARD_WIDTH, CARD_AREA_HEIGHT),5)
+                for i in range(1, ROWS):
+                    pygame.draw.line(screen, BLACK,     (0, i * CARD_HEIGHT), (WIDTH, i * CARD_HEIGHT),5)
+                pygame.display.flip()
+                pygame.time.wait(120)
+                show_all_used = True  
+                continue  
             elif not game_over:
                 col, row = x // CARD_WIDTH, y // CARD_HEIGHT
                 if 0 <= row < ROWS and 0 <= col < COLS:  
@@ -117,39 +154,32 @@ while running:
                             else:
                                 pygame.time.wait(300)
                             flipped_cards = []
-
-    for row in cards:
-        for card in row:
-            if card in flipped_cards or card in found_pairs:
-                pygame.draw.rect(screen, card['color'], card['rect'])
-            else:
-                pygame.draw.rect(screen, GRAY, card['rect'])
-
-    # Draw lines between cards
-    for i in range(1, COLS):
-        pygame.draw.line(screen, BLACK, (i * CARD_WIDTH, 0), (i * CARD_WIDTH, HEIGHT), 3)
-    for i in range(1, ROWS):
-        pygame.draw.line(screen, BLACK, (0, i * CARD_HEIGHT), (WIDTH, i * CARD_HEIGHT), 3)
-
+                            
     screen.blit(timer_surface, timer_rect)
 
     # Draw reset button
-    pygame.draw.ellipse(screen, reset_button_color, reset_button)
+    pygame.draw.rect(screen, reset_button_color, reset_button)
     reset_text = font.render("Reset", True, WHITE)
     reset_text_rect = reset_text.get_rect(center=reset_button.center)
     screen.blit(reset_text, reset_text_rect)
     
+    # Draw showall button
+    pygame.draw.rect(screen, show_all_button_color, show_all_button)
+    show_all_text = font.render("Show All", True, WHITE)
+    show_all_text_rect = show_all_text.get_rect(center=show_all_button.center)
+    screen.blit(show_all_text, show_all_text_rect)
+
     if game_over:
         well_done_text = large_font.render("Well done!", True, WHITE)
         well_done_rect = well_done_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 50))
         background_rect = well_done_rect.inflate(40, 20)  
         pygame.draw.rect(screen, BLACK, background_rect)
         screen.blit(well_done_text, well_done_rect)
-
         pygame.draw.ellipse(screen, play_again_button_color, play_again_button)
         play_again_text = font.render("Play again", True, WHITE)
         play_again_text_rect = play_again_text.get_rect(center=play_again_button.center)
         screen.blit(play_again_text, play_again_text_rect)
+        show_all_used = False
 
     pygame.display.flip()
     clock.tick(FPS)
