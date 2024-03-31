@@ -32,12 +32,16 @@ positive_sound = pygame.mixer.Sound("/Users/rotempeled/Downloads/mixkit-winning-
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Memory Game")
 
-# Initialize font for timer
+# Fonts
 font = pygame.font.Font(None, 24)
+large_font = pygame.font.Font(None, 60)  
 
-# Reset button
+# Reset and Play again button
 reset_button = pygame.Rect(WIDTH - 120, 10, 50, 50)
 reset_button_color = (255, 0, 0)
+play_again_button = pygame.Rect(WIDTH // 2 - 100, HEIGHT // 2, 200, 50)  
+play_again_button_color = (0, 0, 0)
+
 
 def reset_game():
     global cards, flipped_cards, found_pairs, game_over, card_colors, start_time
@@ -78,7 +82,8 @@ clock = pygame.time.Clock()
 running = True
 while running:
     screen.fill(WHITE)
-
+    if len(found_pairs) == ROWS * COLS and not game_over:
+        game_over = True
     # Timer calculation
     elapsed_time = pygame.time.get_ticks() - start_time
     minutes = elapsed_time // 60000  # 60000 milliseconds in a minute
@@ -91,12 +96,17 @@ while running:
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.MOUSEBUTTONDOWN:
-            x, y = event.pos  # Use event.pos directly for the mouse position
+            x, y = event.pos  
+            if game_over and play_again_button.collidepoint((x, y)):
+                reset_game()
+                game_over = False
+                continue
             if reset_button.collidepoint((x, y)):
                 reset_game()
+                continue
             elif not game_over:
                 col, row = x // CARD_WIDTH, y // CARD_HEIGHT
-                if 0 <= row < ROWS and 0 <= col < COLS:  # Ensure click is within the grid bounds
+                if 0 <= row < ROWS and 0 <= col < COLS:  
                     card = cards[row][col]
                     if card not in flipped_cards and card not in found_pairs:
                         flipped_cards.append(card)
@@ -128,11 +138,20 @@ while running:
     reset_text = font.render("Reset", True, WHITE)
     reset_text_rect = reset_text.get_rect(center=reset_button.center)
     screen.blit(reset_text, reset_text_rect)
+    
+    if game_over:
+        well_done_text = large_font.render("Well done!", True, WHITE)
+        well_done_rect = well_done_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 50))
+        background_rect = well_done_rect.inflate(40, 20)  
+        pygame.draw.rect(screen, BLACK, background_rect)
+        screen.blit(well_done_text, well_done_rect)
+
+        pygame.draw.ellipse(screen, play_again_button_color, play_again_button)
+        play_again_text = font.render("Play again", True, WHITE)
+        play_again_text_rect = play_again_text.get_rect(center=play_again_button.center)
+        screen.blit(play_again_text, play_again_text_rect)
 
     pygame.display.flip()
     clock.tick(FPS)
-
-    if len(found_pairs) == ROWS * COLS:
-        game_over = True
 
 pygame.quit()
