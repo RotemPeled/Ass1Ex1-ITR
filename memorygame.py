@@ -29,6 +29,13 @@ COLORS = {
     'light blue': (76, 174, 233)
 }
 
+number_words_to_numbers = {
+    'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+    'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
+    'eleven': 11, 'twelve': 12, 'thirteen': 13, 'fourteen': 14,
+    'fifteen': 15, 'sixteen': 16
+}
+
 # Sounds
 positive_sound = pygame.mixer.Sound("/Users/rotempeled/Downloads/mixkit-winning-a-coin-video-game-2069.wav")
 
@@ -199,9 +206,9 @@ clock = pygame.time.Clock()
 time_attack_initial_time = 60  
 time_attack_time = time_attack_initial_time
 time_decrement = 5  
-running = True
 
 # Main game loop
+running = True
 while running:
     screen.fill(BLACK)
     for row in cards:
@@ -270,28 +277,26 @@ while running:
         time_attack_rect = time_attack_surface.get_rect(topleft=(10, HEIGHT - control_panel_height + 12))
         screen.blit(time_attack_surface, time_attack_rect)
    
-    if player_mode == 4:  # Voice control mode
-        speech_text = capture_and_process_audio(recognizer)
+    if player_mode == 4:
+        speech_text = capture_and_process_audio(recognizer).strip().lower()
         print(speech_text)  # For debugging, see what text is recognized
-        try:
-            spoken_number = int(speech_text.strip())
-            card_to_flip = next((card for row in cards for card in row if card['number'] == spoken_number and card not in flipped_cards and card not in found_pairs), None)
-            if card_to_flip:
-                flip_card_animation(card_to_flip, flip_to_color=True)
-                flipped_cards.append(card_to_flip)
-                if len(flipped_cards) == 2:
-                    # Your existing logic to handle flipped cards
-                    if flipped_cards[0]['value'] == flipped_cards[1]['value']:
-                        found_pairs.extend(flipped_cards)
-                        positive_sound.play()
-                    else:
-                        pygame.time.wait(300)
-                        flip_card_animation(flipped_cards[0], flip_to_color=False)
-                        flip_card_animation(flipped_cards[1], flip_to_color=False)
-                    flipped_cards = []
-        except ValueError:
-            # Handle the case where speech_text is not a number
-            pass
+        if speech_text == 'reset':
+            reset_game()
+            game_over = False
+        spoken_number = number_words_to_numbers.get(speech_text)
+        card_to_flip = next((card for row in cards for card in row if card['number'] == spoken_number and card not in flipped_cards and card not in found_pairs), None)
+        if card_to_flip:
+            flip_card_animation(card_to_flip, flip_to_color=True)
+            flipped_cards.append(card_to_flip)
+            if len(flipped_cards) == 2:
+                pygame.time.wait(300)                  
+                if flipped_cards[0]['value'] == flipped_cards[1]['value']:
+                    found_pairs.extend(flipped_cards)
+                    positive_sound.play()
+                else:
+                    flip_card_animation(flipped_cards[0], flip_to_color=False)
+                    flip_card_animation(flipped_cards[1], flip_to_color=False)
+                flipped_cards = []
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -356,7 +361,6 @@ while running:
         show_all_used = False
 
     if game_over and player_mode == 3 and remaining_time > 0:
-        # Reset for another round in Time Attack mode
         reset_game()
         game_over = False
     
