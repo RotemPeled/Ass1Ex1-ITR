@@ -40,6 +40,7 @@ pygame.display.set_caption("Memory Game")
 
 # Fonts
 font = pygame.font.Font(None, 24)
+mid_font = pygame.font.Font(None, 35)
 large_font = pygame.font.Font(None, 60)  
 
 # Buttons
@@ -51,9 +52,14 @@ show_all_button_color = (100, 100, 255)  # A distinct color
 show_all_used = False
 show_all_button = pygame.Rect(30, HEIGHT - control_panel_height + (control_panel_height - 50) // 2 + 5, 120, 40)
 
+# Player mode selection buttons
+one_player_button = pygame.Rect(WIDTH / 2 - 200, HEIGHT / 2 - 100, 170, 50)
+two_player_button = pygame.Rect(WIDTH / 2 - 200, HEIGHT / 2 + 20, 170, 50)
+attack_mode_button = pygame.Rect(WIDTH / 2 + 50 , HEIGHT / 2 - 100, 170, 50)
+player_mode = 0  # 0 = not selected, 1 = one player, 2 = two players
 
 def reset_game():
-    global cards, flipped_cards, found_pairs, game_over, card_colors, start_time
+    global cards, flipped_cards, found_pairs, game_over, card_colors, start_time, show_all_used, player_turn, player1_score, player2_score
     cards = []
     flipped_cards = []
     found_pairs = []
@@ -61,6 +67,9 @@ def reset_game():
     card_colors = {}
     start_time = pygame.time.get_ticks()
     show_all_used = False
+    player_turn = 1
+    player1_score = 0
+    player2_score = 0
 
     if ROWS * COLS // 2 > len(COLORS):
         color_keys = list(COLORS) * (ROWS * COLS // 2 // len(COLORS) + 1)
@@ -87,7 +96,38 @@ def reset_game():
 # Initialize the game
 reset_game()
 
+# Adding choosing players selection window
+choosing_players = True
+while choosing_players:
+    screen.fill(BLACK)
+
+    # Draw buttons
+    pygame.draw.rect(screen, WHITE, one_player_button)
+    pygame.draw.rect(screen, WHITE, two_player_button)
+    pygame.draw.rect(screen, WHITE, attack_mode_button)
+
+    # Add text to the buttons
+    one_player_text = mid_font.render("1 Player", True, BLACK)
+    two_player_text = mid_font.render("2 Players", True, BLACK)
+    attack_mode_text = mid_font.render("Time attack", True, BLACK)
+    screen.blit(one_player_text, one_player_text.get_rect(center=one_player_button.center))
+    screen.blit(two_player_text, two_player_text.get_rect(center=two_player_button.center))
+    screen.blit(attack_mode_text, attack_mode_text.get_rect(center=attack_mode_button.center))
+
+    pygame.display.flip()
+
+    for event in pygame.event.get():
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+            if one_player_button.collidepoint((mouse_x, mouse_y)):
+                player_mode = 1
+                choosing_players = False
+            elif two_player_button.collidepoint((mouse_x, mouse_y)):
+                player_mode = 2
+                choosing_players = False
+
 # Main game loop
+start_time = pygame.time.get_ticks()
 clock = pygame.time.Clock()
 running = True
 while running:
@@ -110,11 +150,25 @@ while running:
         game_over = True
     # Timer calculation
     elapsed_time = pygame.time.get_ticks() - start_time
-    minutes = elapsed_time // 60000  # 60000 milliseconds in a minute
-    seconds = (elapsed_time % 60000) // 1000  # 1000 milliseconds in a second
+    minutes = elapsed_time // 60000  
+    seconds = (elapsed_time % 60000) // 1000  
     timer_text = f"{minutes:02}:{seconds:02}"
     timer_surface = font.render(timer_text, True, BLACK)
     timer_rect = timer_surface.get_rect(topleft=(10, 10))
+    
+    # 2 players mode
+    if player_mode == 2:
+        turn_text = f"Player {player_turn}'s turn"
+        turn_surface = mid_font.render(turn_text, True, WHITE)
+        screen.blit(turn_surface, (325, HEIGHT - control_panel_height + 12))
+        player1_score_text = f"Player 1 Score: {player1_score}"
+        player1_score_surface = font.render(player1_score_text, True, WHITE)
+        player1_score_rect = player1_score_surface.get_rect(topleft=(10, HEIGHT - control_panel_height + 5))
+        player2_score_text = f"Player 2 Score: {player2_score}"
+        player2_score_surface = font.render(player2_score_text, True, WHITE)
+        player2_score_rect = player2_score_surface.get_rect(topleft=(10, player1_score_rect.bottom + 5))
+        screen.blit(player1_score_surface, player1_score_rect)
+        screen.blit(player2_score_surface, player2_score_rect)
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -125,22 +179,23 @@ while running:
                 reset_game()
                 game_over = False
                 continue
+            if player_mode == 1:
+                if show_all_button.collidepoint((x, y)) and not show_all_used:
+                    for row in cards:
+                        for card in row:
+                            pygame.draw.rect(screen, card['color'], card['rect'])
+                    for i in range(1, COLS):
+                        pygame.draw.line(screen, BLACK, (i * CARD_WIDTH, 0), (i * CARD_WIDTH, CARD_AREA_HEIGHT),5)
+                    for i in range(1, ROWS):
+                        pygame.draw.line(screen, BLACK,     (0, i * CARD_HEIGHT), (WIDTH, i * CARD_HEIGHT),5)
+                    pygame.display.flip()
+                    pygame.time.wait(120)
+                    show_all_used = True  
+                    continue  
             if reset_button.collidepoint((x, y)):
                 reset_game()
                 show_all_used = False
                 continue
-            if show_all_button.collidepoint((x, y)) and not show_all_used:
-                for row in cards:
-                    for card in row:
-                        pygame.draw.rect(screen, card['color'], card['rect'])
-                for i in range(1, COLS):
-                    pygame.draw.line(screen, BLACK, (i * CARD_WIDTH, 0), (i * CARD_WIDTH, CARD_AREA_HEIGHT),5)
-                for i in range(1, ROWS):
-                    pygame.draw.line(screen, BLACK,     (0, i * CARD_HEIGHT), (WIDTH, i * CARD_HEIGHT),5)
-                pygame.display.flip()
-                pygame.time.wait(120)
-                show_all_used = True  
-                continue  
             elif not game_over:
                 col, row = x // CARD_WIDTH, y // CARD_HEIGHT
                 if 0 <= row < ROWS and 0 <= col < COLS:  
@@ -149,12 +204,21 @@ while running:
                         flipped_cards.append(card)
                         if len(flipped_cards) == 2:
                             if flipped_cards[0]['value'] == flipped_cards[1]['value']:
+                                if player_mode == 2:
+                                    # Increment the score of the current player
+                                    if player_turn == 1:
+                                        player1_score += 1
+                                    else:
+                                        player2_score += 1
                                 found_pairs.extend(flipped_cards)
                                 positive_sound.play()
                             else:
                                 pygame.time.wait(300)
+                                # Switch turns in a 2 player game
+                                if player_mode == 2:
+                                    player_turn = 2 if player_turn == 1 else 1
                             flipped_cards = []
-                            
+
     screen.blit(timer_surface, timer_rect)
 
     # Draw reset button
@@ -164,10 +228,11 @@ while running:
     screen.blit(reset_text, reset_text_rect)
     
     # Draw showall button
-    pygame.draw.rect(screen, show_all_button_color, show_all_button)
-    show_all_text = font.render("Show All", True, WHITE)
-    show_all_text_rect = show_all_text.get_rect(center=show_all_button.center)
-    screen.blit(show_all_text, show_all_text_rect)
+    if player_mode == 1:
+        pygame.draw.rect(screen, show_all_button_color, show_all_button)
+        show_all_text = font.render("Show All", True, WHITE)
+        show_all_text_rect = show_all_text.get_rect(center=show_all_button.center)
+        screen.blit(show_all_text, show_all_text_rect)
 
     if game_over:
         well_done_text = large_font.render("Well done!", True, WHITE)
