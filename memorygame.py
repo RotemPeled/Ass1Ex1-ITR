@@ -1,5 +1,9 @@
 import pygame
 import random
+from vosk import Model, KaldiRecognizer
+import json
+import sounddevice as sd
+import numpy as np
 
 # Initialize Pygame
 pygame.init()
@@ -59,6 +63,24 @@ attack_mode_button = pygame.Rect(WIDTH / 2 - 80 , HEIGHT / 2 - 100, 170, 50)
 voice_control_button = pygame.Rect(WIDTH / 2 + 140 , HEIGHT / 2 - 100, 170, 50)
 player_mode = 0  # 0 = not selected, 1 = one player, 2 = two players, 3 = attack mode, 4 = voice control
 
+# Load Vosk model
+model = Model("/Users/rotempeled/Downloads/vosk-model-small-en-us-0.15")
+recognizer = KaldiRecognizer(model, 16000)  # 16000 is the sample rate
+
+# Function to process voice input and return text
+def recognize_speech_from_mic(recognizer, audio):
+    if recognizer.AcceptWaveform(audio):
+        result = json.loads(recognizer.Result())
+        return result.get('text', '')
+    return ''
+
+# Function to capture and process audio
+def capture_and_process_audio(recognizer, duration=1):
+    with sd.RawInputStream(samplerate=16000, blocksize=2048, dtype='int16', channels=1, callback=None) as stream:
+        audio_data = stream.read(int(16000 * duration))
+        audio_array = np.frombuffer(audio_data[0], dtype=np.int16)
+        return recognize_speech_from_mic(recognizer, audio_array.tobytes())
+
 def flip_card_animation(card, flip_to_color=True):
     color_side = card['color']
     back_side = GRAY
@@ -108,6 +130,10 @@ def reset_game():
     for i in range(ROWS * COLS // 2):
         card_colors[i] = COLORS[color_keys[i]]
 
+    card_number = 1  # Start numbering from 1
+    for i in range(ROWS * COLS // 2):
+        card_colors[i] = COLORS[color_keys[i]]
+        
     card_values = list(range(ROWS * COLS // 2)) * 2
     random.shuffle(card_values)
 
@@ -117,8 +143,11 @@ def reset_game():
             card_value = card_values.pop()
             card = {'rect': pygame.Rect(col * CARD_WIDTH, row * CARD_HEIGHT, CARD_WIDTH, CARD_HEIGHT),
                     'value': card_value,
-                    'color': card_colors[card_value]}
+                    'color': card_colors[card_value],
+                    'number': card_number}
+
             row_cards.append(card)
+            card_number += 1
         cards.append(row_cards)
 
 # Initialize the game
@@ -181,6 +210,10 @@ while running:
                 pygame.draw.rect(screen, card['color'], card['rect'])
             else:
                 pygame.draw.rect(screen, GRAY, card['rect'])
+            if player_mode == 4:
+                card_number_text = large_font.render(str(card['number']), True, BLACK)
+                card_number_text_rect = card_number_text.get_rect(center=card['rect'].center)
+                screen.blit(card_number_text, card_number_text_rect)
 
     # Draw lines between cards
     CARD_AREA_HEIGHT = HEIGHT - control_panel_height
@@ -202,19 +235,17 @@ while running:
         timer_surface = font.render(timer_text, True, BLACK)
         timer_rect = timer_surface.get_rect(topleft=(10, 10))
         screen.blit(timer_surface, timer_rect)
-    
-    if player_mode == 3:
-        remaining_time = time_attack_time - ((pygame.time.get_ticks() - start_time) // 1000)
-        remaining_time = max(0, remaining_time)
-        if remaining_time <= 0 and not game_over:
-            game_over = True
-            remaining_time = 0  
-        time_attack_text = f"Time left: {remaining_time}"
-        time_attack_surface = mid_font.render(time_attack_text, True, WHITE)
-        time_attack_rect = time_attack_surface.get_rect(topleft=(10, HEIGHT - control_panel_height + 12))
-        screen.blit(time_attack_surface, time_attack_rect)
-            
-    # 2 players mode
+        pygame.draw.rect(screen, reset_button_color, reset_button)
+        reset_text = font.render("Reset", True, WHITE)
+        reset_text_rect = reset_text.get_rect(center=reset_button.center)
+        screen.blit(reset_text, reset_text_rect)
+        
+    if player_mode == 1:
+        pygame.draw.rect(screen, show_all_button_color, show_all_button)
+        show_all_text = font.render("Show All", True, WHITE)
+        show_all_text_rect = show_all_text.get_rect(center=show_all_button.center)
+        screen.blit(show_all_text, show_all_text_rect)
+             
     if player_mode == 2:
         turn_text = f"Player {player_turn}'s turn"
         turn_surface = mid_font.render(turn_text, True, WHITE)
@@ -227,6 +258,40 @@ while running:
         player2_score_rect = player2_score_surface.get_rect(topleft=(10, player1_score_rect.bottom + 5))
         screen.blit(player1_score_surface, player1_score_rect)
         screen.blit(player2_score_surface, player2_score_rect)
+        
+    if player_mode == 3:
+        remaining_time = time_attack_time - ((pygame.time.get_ticks() - start_time) // 1000)
+        remaining_time = max(0, remaining_time)
+        if remaining_time <= 0 and not game_over:
+            game_over = True
+            remaining_time = 0  
+        time_attack_text = f"Time left: {remaining_time}"
+        time_attack_surface = mid_font.render(time_attack_text, True, WHITE)
+        time_attack_rect = time_attack_surface.get_rect(topleft=(10, HEIGHT - control_panel_height + 12))
+        screen.blit(time_attack_surface, time_attack_rect)
+   
+    if player_mode == 4:  # Voice control mode
+        speech_text = capture_and_process_audio(recognizer)
+        print(speech_text)  # For debugging, see what text is recognized
+        try:
+            spoken_number = int(speech_text.strip())
+            card_to_flip = next((card for row in cards for card in row if card['number'] == spoken_number and card not in flipped_cards and card not in found_pairs), None)
+            if card_to_flip:
+                flip_card_animation(card_to_flip, flip_to_color=True)
+                flipped_cards.append(card_to_flip)
+                if len(flipped_cards) == 2:
+                    # Your existing logic to handle flipped cards
+                    if flipped_cards[0]['value'] == flipped_cards[1]['value']:
+                        found_pairs.extend(flipped_cards)
+                        positive_sound.play()
+                    else:
+                        pygame.time.wait(300)
+                        flip_card_animation(flipped_cards[0], flip_to_color=False)
+                        flip_card_animation(flipped_cards[1], flip_to_color=False)
+                    flipped_cards = []
+        except ValueError:
+            # Handle the case where speech_text is not a number
+            pass
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -277,20 +342,6 @@ while running:
                                 if player_mode == 2:
                                     player_turn = 2 if player_turn == 1 else 1
                             flipped_cards = []
-
-    # Draw reset button
-    if player_mode != 3:
-        pygame.draw.rect(screen, reset_button_color, reset_button)
-        reset_text = font.render("Reset", True, WHITE)
-        reset_text_rect = reset_text.get_rect(center=reset_button.center)
-        screen.blit(reset_text, reset_text_rect)
-    
-    # Draw showall button
-    if player_mode == 1:
-        pygame.draw.rect(screen, show_all_button_color, show_all_button)
-        show_all_text = font.render("Show All", True, WHITE)
-        show_all_text_rect = show_all_text.get_rect(center=show_all_button.center)
-        screen.blit(show_all_text, show_all_text_rect)
 
     if game_over and player_mode != 3:
         well_done_text = large_font.render("Well done!", True, WHITE)
