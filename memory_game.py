@@ -53,10 +53,35 @@ show_all_used = False
 show_all_button = pygame.Rect(30, HEIGHT - control_panel_height + (control_panel_height - 50) // 2 + 5, 120, 40)
 
 # Player mode selection buttons
-one_player_button = pygame.Rect(WIDTH / 2 - 200, HEIGHT / 2 - 100, 170, 50)
-two_player_button = pygame.Rect(WIDTH / 2 - 200, HEIGHT / 2 + 20, 170, 50)
-attack_mode_button = pygame.Rect(WIDTH / 2 + 50 , HEIGHT / 2 - 100, 170, 50)
-player_mode = 0  # 0 = not selected, 1 = one player, 2 = two players, 3 = attack mode
+one_player_button = pygame.Rect(WIDTH / 2 - 300, HEIGHT / 2 - 100, 170, 50)
+two_player_button = pygame.Rect(WIDTH / 2 - 300, HEIGHT / 2 + 20, 170, 50)
+attack_mode_button = pygame.Rect(WIDTH / 2 - 80 , HEIGHT / 2 - 100, 170, 50)
+voice_control_button = pygame.Rect(WIDTH / 2 + 140 , HEIGHT / 2 - 100, 170, 50)
+player_mode = 0  # 0 = not selected, 1 = one player, 2 = two players, 3 = attack mode, 4 = voice control
+
+def flip_card_animation(card, flip_to_color=True):
+    color_side = card['color']
+    back_side = GRAY
+    flip_speed = 15  # Adjust for faster or slower flipping
+
+    for scale in range(CARD_WIDTH, 0, -flip_speed):
+        pygame.draw.rect(screen, BLACK, card['rect'])
+        if flip_to_color:
+            pygame.draw.rect(screen, back_side, (card['rect'].x, card['rect'].y, scale, CARD_HEIGHT))
+        else:
+            pygame.draw.rect(screen, color_side, (card['rect'].x, card['rect'].y, CARD_WIDTH - scale, CARD_HEIGHT))
+        pygame.display.update(card['rect'])
+        pygame.time.wait(5)  
+
+    for scale in range(0, CARD_WIDTH, flip_speed):
+        pygame.draw.rect(screen, BLACK, card['rect'])
+        if flip_to_color:
+            pygame.draw.rect(screen, color_side, (card['rect'].x + CARD_WIDTH - scale, card['rect'].y, scale, CARD_HEIGHT))
+        else:
+            pygame.draw.rect(screen, back_side, (card['rect'].x + scale, card['rect'].y, CARD_WIDTH - scale, CARD_HEIGHT))
+        pygame.display.update(card['rect'])
+        pygame.time.wait(5)  
+
 
 def reset_game():
     global cards, flipped_cards, found_pairs, game_over, card_colors, start_time, show_all_used, player_turn, player1_score, player2_score, time_attack_time
@@ -108,14 +133,17 @@ while choosing_players:
     pygame.draw.rect(screen, WHITE, one_player_button)
     pygame.draw.rect(screen, WHITE, two_player_button)
     pygame.draw.rect(screen, WHITE, attack_mode_button)
+    pygame.draw.rect(screen, WHITE, voice_control_button)
 
     # Add text to the buttons
     one_player_text = mid_font.render("1 Player", True, BLACK)
     two_player_text = mid_font.render("2 Players", True, BLACK)
     attack_mode_text = mid_font.render("Time attack", True, BLACK)
+    voice_control_text = mid_font.render("Voice control", True, BLACK)
     screen.blit(one_player_text, one_player_text.get_rect(center=one_player_button.center))
     screen.blit(two_player_text, two_player_text.get_rect(center=two_player_button.center))
     screen.blit(attack_mode_text, attack_mode_text.get_rect(center=attack_mode_button.center))
+    screen.blit(voice_control_text, voice_control_text.get_rect(center=voice_control_button.center))
 
     pygame.display.flip()
 
@@ -131,7 +159,9 @@ while choosing_players:
             elif attack_mode_button.collidepoint((mouse_x, mouse_y)):
                 player_mode = 3
                 choosing_players = False
-
+            elif voice_control_button.collidepoint((mouse_x, mouse_y)):
+                player_mode = 4
+                choosing_players = False
 
 start_time = pygame.time.get_ticks()
 clock = pygame.time.Clock()
@@ -229,20 +259,21 @@ while running:
                 if 0 <= row < ROWS and 0 <= col < COLS:  
                     card = cards[row][col]
                     if card not in flipped_cards and card not in found_pairs:
+                        flip_card_animation(card, flip_to_color=True)
                         flipped_cards.append(card)
                         if len(flipped_cards) == 2:
                             if flipped_cards[0]['value'] == flipped_cards[1]['value']:
                                 if player_mode == 2:
-                                    # Increment the score of the current player
                                     if player_turn == 1:
                                         player1_score += 1
                                     else:
                                         player2_score += 1
                                 found_pairs.extend(flipped_cards)
-                                positive_sound.play()
+                                positive_sound.play() 
                             else:
                                 pygame.time.wait(300)
-                                # Switch turns in a 2 player game
+                                flip_card_animation(flipped_cards[0], flip_to_color=False) 
+                                flip_card_animation(flipped_cards[1], flip_to_color=False) 
                                 if player_mode == 2:
                                     player_turn = 2 if player_turn == 1 else 1
                             flipped_cards = []
