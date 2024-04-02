@@ -56,10 +56,10 @@ show_all_button = pygame.Rect(30, HEIGHT - control_panel_height + (control_panel
 one_player_button = pygame.Rect(WIDTH / 2 - 200, HEIGHT / 2 - 100, 170, 50)
 two_player_button = pygame.Rect(WIDTH / 2 - 200, HEIGHT / 2 + 20, 170, 50)
 attack_mode_button = pygame.Rect(WIDTH / 2 + 50 , HEIGHT / 2 - 100, 170, 50)
-player_mode = 0  # 0 = not selected, 1 = one player, 2 = two players
+player_mode = 0  # 0 = not selected, 1 = one player, 2 = two players, 3 = attack mode
 
 def reset_game():
-    global cards, flipped_cards, found_pairs, game_over, card_colors, start_time, show_all_used, player_turn, player1_score, player2_score
+    global cards, flipped_cards, found_pairs, game_over, card_colors, start_time, show_all_used, player_turn, player1_score, player2_score, time_attack_time
     cards = []
     flipped_cards = []
     found_pairs = []
@@ -70,6 +70,9 @@ def reset_game():
     player_turn = 1
     player1_score = 0
     player2_score = 0
+    
+    if player_mode == 3:
+        time_attack_time = max(5, time_attack_time - time_decrement)
 
     if ROWS * COLS // 2 > len(COLORS):
         color_keys = list(COLORS) * (ROWS * COLS // 2 // len(COLORS) + 1)
@@ -125,11 +128,21 @@ while choosing_players:
             elif two_player_button.collidepoint((mouse_x, mouse_y)):
                 player_mode = 2
                 choosing_players = False
+            elif attack_mode_button.collidepoint((mouse_x, mouse_y)):
+                player_mode = 3
+                choosing_players = False
 
-# Main game loop
+
 start_time = pygame.time.get_ticks()
 clock = pygame.time.Clock()
+
+# timer for time attack mode
+time_attack_initial_time = 60  
+time_attack_time = time_attack_initial_time
+time_decrement = 5  
 running = True
+
+# Main game loop
 while running:
     screen.fill(BLACK)
     for row in cards:
@@ -148,14 +161,29 @@ while running:
         
     if len(found_pairs) == ROWS * COLS and not game_over:
         game_over = True
+    
     # Timer calculation
     elapsed_time = pygame.time.get_ticks() - start_time
     minutes = elapsed_time // 60000  
     seconds = (elapsed_time % 60000) // 1000  
-    timer_text = f"{minutes:02}:{seconds:02}"
-    timer_surface = font.render(timer_text, True, BLACK)
-    timer_rect = timer_surface.get_rect(topleft=(10, 10))
     
+    if player_mode != 3: 
+        timer_text = f"{minutes:02}:{seconds:02}"
+        timer_surface = font.render(timer_text, True, BLACK)
+        timer_rect = timer_surface.get_rect(topleft=(10, 10))
+        screen.blit(timer_surface, timer_rect)
+    
+    if player_mode == 3:
+        remaining_time = time_attack_time - ((pygame.time.get_ticks() - start_time) // 1000)
+        remaining_time = max(0, remaining_time)
+        if remaining_time <= 0 and not game_over:
+            game_over = True
+            remaining_time = 0  
+        time_attack_text = f"Time left: {remaining_time}"
+        time_attack_surface = mid_font.render(time_attack_text, True, WHITE)
+        time_attack_rect = time_attack_surface.get_rect(topleft=(10, HEIGHT - control_panel_height + 12))
+        screen.blit(time_attack_surface, time_attack_rect)
+            
     # 2 players mode
     if player_mode == 2:
         turn_text = f"Player {player_turn}'s turn"
@@ -219,13 +247,12 @@ while running:
                                     player_turn = 2 if player_turn == 1 else 1
                             flipped_cards = []
 
-    screen.blit(timer_surface, timer_rect)
-
     # Draw reset button
-    pygame.draw.rect(screen, reset_button_color, reset_button)
-    reset_text = font.render("Reset", True, WHITE)
-    reset_text_rect = reset_text.get_rect(center=reset_button.center)
-    screen.blit(reset_text, reset_text_rect)
+    if player_mode != 3:
+        pygame.draw.rect(screen, reset_button_color, reset_button)
+        reset_text = font.render("Reset", True, WHITE)
+        reset_text_rect = reset_text.get_rect(center=reset_button.center)
+        screen.blit(reset_text, reset_text_rect)
     
     # Draw showall button
     if player_mode == 1:
@@ -234,7 +261,7 @@ while running:
         show_all_text_rect = show_all_text.get_rect(center=show_all_button.center)
         screen.blit(show_all_text, show_all_text_rect)
 
-    if game_over:
+    if game_over and player_mode != 3:
         well_done_text = large_font.render("Well done!", True, WHITE)
         well_done_rect = well_done_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 50))
         background_rect = well_done_rect.inflate(40, 20)  
@@ -246,6 +273,19 @@ while running:
         screen.blit(play_again_text, play_again_text_rect)
         show_all_used = False
 
+    if game_over and player_mode == 3 and remaining_time > 0:
+        # Reset for another round in Time Attack mode
+        reset_game()
+        game_over = False
+    
+    elif game_over and player_mode == 3 and remaining_time <= 0:
+        game_over_text = large_font.render("Time's up!", True, WHITE)
+        game_over_rect = game_over_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 50))
+        background_rect = game_over_rect.inflate(40, 20)  
+        pygame.draw.rect(screen, BLACK, background_rect)
+        screen.blit(game_over_text, game_over_rect)       
+
+        
     pygame.display.flip()
     clock.tick(FPS)
 
