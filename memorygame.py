@@ -4,9 +4,13 @@ from vosk import Model, KaldiRecognizer
 import json
 import sounddevice as sd
 import numpy as np
+import threading
+import queue
 
 # Initialize Pygame
 pygame.init()
+
+running = True
 
 # Constants for the game
 WIDTH, HEIGHT = 800, 600
@@ -30,7 +34,7 @@ COLORS = {
 }
 
 number_words_to_numbers = {
-    'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+    'one': 1, 'two': 2, 'three': 3, 'four': 4, 'for':4, 'five': 5,
     'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
     'eleven': 11, 'twelve': 12, 'thirteen': 13, 'fourteen': 14,
     'fifteen': 15, 'sixteen': 16
@@ -46,7 +50,6 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
 
 # Set up the display
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Memory Game")
 
 # Fonts
@@ -70,6 +73,18 @@ attack_mode_button = pygame.Rect(WIDTH / 2 - 80 , HEIGHT / 2 - 100, 170, 50)
 voice_control_button = pygame.Rect(WIDTH / 2 + 140 , HEIGHT / 2 - 100, 170, 50)
 player_mode = 0  # 0 = not selected, 1 = one player, 2 = two players, 3 = attack mode, 4 = voice control
 
+audio_queue = queue.Queue()
+
+def audio_listener():
+    with sd.RawInputStream(samplerate=16000, blocksize=8000, dtype='int16', channels=1) as stream:
+        while running:
+            audio_data = stream.read(8000)
+            audio_array = np.frombuffer(audio_data[0], dtype=np.int16)
+            if recognizer.AcceptWaveform(audio_array.tobytes()):
+                result = json.loads(recognizer.Result())
+                recognized_text = result.get('text', '').strip().lower()
+                audio_queue.put(recognized_text)
+
 # Load Vosk model
 model = Model("/Users/rotempeled/Downloads/vosk-model-small-en-us-0.15")
 recognizer = KaldiRecognizer(model, 16000)  # 16000 is the sample rate
@@ -82,16 +97,16 @@ def recognize_speech_from_mic(recognizer, audio):
     return ''
 
 # Function to capture and process audio
-def capture_and_process_audio(recognizer, duration=1):
-    with sd.RawInputStream(samplerate=16000, blocksize=2048, dtype='int16', channels=1, callback=None) as stream:
+def capture_and_process_audio(recognizer, duration=0.5):
+    with sd.RawInputStream(samplerate=16000, blocksize=1024, dtype='int16', channels=1, callback=None) as stream:
         audio_data = stream.read(int(16000 * duration))
         audio_array = np.frombuffer(audio_data[0], dtype=np.int16)
         return recognize_speech_from_mic(recognizer, audio_array.tobytes())
-
+    
 def flip_card_animation(card, flip_to_color=True):
     color_side = card['color']
     back_side = GRAY
-    flip_speed = 15  # Adjust for faster or slower flipping
+    flip_speed = 15  
 
     for scale in range(CARD_WIDTH, 0, -flip_speed):
         pygame.draw.rect(screen, BLACK, card['rect'])
@@ -160,6 +175,9 @@ def reset_game():
 # Initialize the game
 reset_game()
 
+audio_listener_thread = threading.Thread(target=audio_listener)
+audio_listener_thread.start()
+
 # Adding choosing players selection window
 choosing_players = True
 while choosing_players:
@@ -208,7 +226,6 @@ time_attack_time = time_attack_initial_time
 time_decrement = 5  
 
 # Main game loop
-running = True
 while running:
     screen.fill(BLACK)
     for row in cards:
@@ -278,25 +295,28 @@ while running:
         screen.blit(time_attack_surface, time_attack_rect)
    
     if player_mode == 4:
-        speech_text = capture_and_process_audio(recognizer).strip().lower()
-        print(speech_text)  # For debugging, see what text is recognized
-        if speech_text == 'reset':
-            reset_game()
-            game_over = False
-        spoken_number = number_words_to_numbers.get(speech_text)
-        card_to_flip = next((card for row in cards for card in row if card['number'] == spoken_number and card not in flipped_cards and card not in found_pairs), None)
-        if card_to_flip:
-            flip_card_animation(card_to_flip, flip_to_color=True)
-            flipped_cards.append(card_to_flip)
-            if len(flipped_cards) == 2:
-                pygame.time.wait(300)                  
-                if flipped_cards[0]['value'] == flipped_cards[1]['value']:
-                    found_pairs.extend(flipped_cards)
-                    positive_sound.play()
-                else:
-                    flip_card_animation(flipped_cards[0], flip_to_color=False)
-                    flip_card_animation(flipped_cards[1], flip_to_color=False)
-                flipped_cards = []
+        while not audio_queue.empty():
+            speech_text = audio_queue.get()
+            print(f"Recognized: {speech_text}")  # Debugging output
+            spoken_number = number_words_to_numbers.get(speech_text)
+
+            if spoken_number:
+                card_to_flip = next((card for row in cards for card in row if card['number'] == spoken_number and card not in flipped_cards and card not in found_pairs), None)
+                if card_to_flip:
+                    flip_card_animation(card_to_flip, flip_to_color=True)
+                    flipped_cards.append(card_to_flip)
+                    if len(flipped_cards) == 2:
+                        pygame.time.wait(300)                  
+                        if flipped_cards[0]['value'] == flipped_cards[1]['value']:
+                            found_pairs.extend(flipped_cards)
+                            positive_sound.play()
+                        else:
+                            flip_card_animation(flipped_cards[0], flip_to_color=False)
+                            flip_card_animation(flipped_cards[1], flip_to_color=False)
+                        flipped_cards = []
+            elif speech_text == 'reset':
+                reset_game()
+                game_over = False
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -375,4 +395,6 @@ while running:
     pygame.display.flip()
     clock.tick(FPS)
 
+running = False
+audio_listener_thread.join()
 pygame.quit()
