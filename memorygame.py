@@ -41,7 +41,7 @@ number_words_to_numbers = {
 }
 
 # Sounds
-positive_sound = pygame.mixer.Sound("/Users/rotempeled/Downloads/mixkit-winning-a-coin-video-game-2069.wav")
+positive_sound = pygame.mixer.Sound("mixkit-winning-a-coin-video-game-2069.wav")
 
 # Control panel dimensions
 control_panel_height = 50  # Adjust the height as needed
@@ -114,6 +114,7 @@ def flip_card_animation(card, flip_to_color=True):
             pygame.draw.rect(screen, back_side, (card['rect'].x, card['rect'].y, scale, CARD_HEIGHT))
         else:
             pygame.draw.rect(screen, color_side, (card['rect'].x, card['rect'].y, CARD_WIDTH - scale, CARD_HEIGHT))
+        draw_dividing_lines() 
         pygame.display.update(card['rect'])
         pygame.time.wait(5)  
 
@@ -123,9 +124,23 @@ def flip_card_animation(card, flip_to_color=True):
             pygame.draw.rect(screen, color_side, (card['rect'].x + CARD_WIDTH - scale, card['rect'].y, scale, CARD_HEIGHT))
         else:
             pygame.draw.rect(screen, back_side, (card['rect'].x + scale, card['rect'].y, CARD_WIDTH - scale, CARD_HEIGHT))
+        draw_dividing_lines()  
         pygame.display.update(card['rect'])
         pygame.time.wait(5)  
 
+    if player_mode == 4:
+        card_number_text = large_font.render(str(card['number']), True, BLACK)
+        card_number_text_rect = card_number_text.get_rect(center=card['rect'].center)
+        screen.blit(card_number_text, card_number_text_rect)
+        draw_dividing_lines() 
+        pygame.display.update(card['rect'])
+
+def draw_dividing_lines():
+    CARD_AREA_HEIGHT = HEIGHT - control_panel_height
+    for i in range(1, COLS):
+        pygame.draw.line(screen, BLACK, (i * CARD_WIDTH, 0), (i * CARD_WIDTH, CARD_AREA_HEIGHT), 5)
+    for i in range(1, ROWS):
+        pygame.draw.line(screen, BLACK, (0, i * CARD_HEIGHT), (WIDTH, i * CARD_HEIGHT), 5)
 
 def reset_game():
     global cards, flipped_cards, found_pairs, game_over, card_colors, start_time, show_all_used, player_turn, player1_score, player2_score, time_attack_time
@@ -221,7 +236,7 @@ start_time = pygame.time.get_ticks()
 clock = pygame.time.Clock()
 
 # timer for time attack mode
-time_attack_initial_time = 60  
+time_attack_initial_time = 30
 time_attack_time = time_attack_initial_time
 time_decrement = 5  
 
@@ -250,11 +265,12 @@ while running:
         game_over = True
     
     # Timer calculation
-    elapsed_time = pygame.time.get_ticks() - start_time
-    minutes = elapsed_time // 60000  
-    seconds = (elapsed_time % 60000) // 1000  
+    if not game_over or player_mode == 3:
+        elapsed_time = pygame.time.get_ticks() - start_time     
     
     if player_mode != 3: 
+        minutes = elapsed_time // 60000  
+        seconds = (elapsed_time % 60000) // 1000 
         timer_text = f"{minutes:02}:{seconds:02}"
         timer_surface = font.render(timer_text, True, BLACK)
         timer_rect = timer_surface.get_rect(topleft=(10, 10))
@@ -297,7 +313,6 @@ while running:
     if player_mode == 4:
         while not audio_queue.empty():
             speech_text = audio_queue.get()
-            print(f"Recognized: {speech_text}")  # Debugging output
             spoken_number = number_words_to_numbers.get(speech_text)
 
             if spoken_number:
@@ -317,12 +332,17 @@ while running:
             elif speech_text == 'reset':
                 reset_game()
                 game_over = False
+            elif speech_text == 'play again' and game_over == True:
+                reset_game()
+                game_over = False
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.MOUSEBUTTONDOWN:
             x, y = event.pos  
+            if game_over and player_mode == 3:
+                continue
             if game_over and play_again_button.collidepoint((x, y)):
                 reset_game()
                 game_over = False
@@ -390,7 +410,6 @@ while running:
         background_rect = game_over_rect.inflate(40, 20)  
         pygame.draw.rect(screen, BLACK, background_rect)
         screen.blit(game_over_text, game_over_rect)       
-
         
     pygame.display.flip()
     clock.tick(FPS)
