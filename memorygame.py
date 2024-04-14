@@ -236,7 +236,7 @@ start_time = pygame.time.get_ticks()
 clock = pygame.time.Clock()
 
 # timer for time attack mode
-time_attack_initial_time = 30
+time_attack_initial_time = 60
 time_attack_time = time_attack_initial_time
 time_decrement = 5  
 
